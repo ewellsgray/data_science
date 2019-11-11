@@ -3,6 +3,7 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import seaborn as sn
 
 #%% Simulate populations for testing
 # The aim here have a large enough sample point that it fully represents the 
@@ -10,9 +11,10 @@ import matplotlib.pyplot as plt
 
 def plot_dist(dist, color,new=True):
     if new == True:
-        plt.figure(figsize=(3,3))
-        
-    plt.hist(dist,100,color=color)
+        fig,(ax1,ax2) = plt.subplots(1,2,(figsize=(5,5))
+    
+    ax1.hist(dist,40,color=color, edgecolor='black')
+    #plt.hist(dist,40,color=color, edgecolor='black')
     plt.xlabel("value")
     plt.ylabel("count")    
     return 0

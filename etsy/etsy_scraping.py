@@ -11,62 +11,95 @@ from bs4 import BeautifulSoup as bs
 import requests
 import pandas as pd
 
-# source = file oath
-#with open(source) as html_file:
-#with open("http://www.ohiostatehouse.org/") as html_file:
-#    soup = bs(html_file, "lxml")
-#    print("hello")
 
 #%%
-source = requests.get("https://www.etsy.com/c/home-and-living?ref=catnav-891").text
-soup = bs(source, "lxml")
-print(soup.prettify())              
-#%%
+url_base ="https://www.etsy.com/c/home-and-living?ref=pagination&page="
+R = 8
+urls=[]
+for r in range(R): 
+    urls.append(url_base+str(r+2))
+    
+#urls = ["https://www.etsy.com/c/home-and-living?ref=pagination&page=2",
+#        "https://www.etsy.com/c/home-and-living?ref=pagination&page=3",
+#        "https://www.etsy.com/c/home-and-living?ref=pagination&page=4",
+#        "https://www.etsy.com/c/home-and-living?ref=pagination&page=5"]
 
-#article = soup.find("ul",data-target="category-block-grid", class_="list-unstyled block-grid-xs-2 show-xs show-sm show-md  hide-lg hide-xl hide-tv")
-element = soup.find("ul")
-#print(element["role"])
-#print(element.contents)
+page_count = 0
 
-for child in element.children:
-    print("CHILD:"+str(child))
-
-#print(element.prettify())
-list_id=464949133
-#data-listing-id="464949133"
-
-
-#print(soup.prettify())
-#print(soup.title)
-#print(soup.text)
-
-#%%
-li_match = soup.find_all("li")
-
-price = {}
-link = {}
-seller = {}
+id = []
+href = []
+price = []
+blurb = []
+seller = []
+stars = []
 li_list = []
+numrate = []
 
-for li in range(450,490):
+for url in urls:
+    page_count+=1
+    source = requests.get(url).text
+    #source = requests.get("https://www.etsy.com/c/home-and-living?ref=catnav-792").text
+    soup = bs(source, "lxml")
+    #print(soup.prettify())              
     
-    matchi=li_match[li]
-    #tagi = matchi.find("span", class_="currency-value")
+    #%%
+    #article = soup.find("ul",data-target="category-block-grid", class_="list-unstyled block-grid-xs-2 show-xs show-sm show-md  hide-lg hide-xl hide-tv")
+    element = soup.find("ul",{"class":"responsive-listing-grid wt-grid wt-grid--block justify-content-flex-start pl-xs-0"})    
+    li_match = element.find_all("li")
     
-    seller_li = str(matchi.find("class":"v2-listing-card__shop"}).text)
+    #for li in range(150,490):
+    for item in li_match:#[0:20]:   
+        try: 
+            id_i = str(item.find("div",{"class":"js-merch-stash-check-listing"})["data-palette-listing-id"])
+            id.append(id_i)
+            
+            href_i = str(item.find("a",{"class":"display-inline-block listing-link"})["href"])
+            href.append(href_i)
+            
+            seller_i = str(item.find("div",{"class":"v2-listing-card__shop"}).p.text)
+            seller.append(seller_i)
+            #seller.update({li:seller_i})
+            
+            # get current price
+            price_i = str(item.find("span", {"class":"currency-value"}).text)
+            price.append(price_i)
+            #price.update({li:price_i})
+        
+            # get blurb
+            blurb_i = str(item.find("h2",{"class":"text-gray text-truncate mb-xs-0 text-body"}).text) 
+            blurb.append(blurb_i)
+            #blurb.update({li:blurb_i})
+            
+            stars_i = str(item.find("input",{"name":"rating"})["value"]) 
+            stars.append(stars_i)
     
-    # get current price
-    price_li = str(matchi.find("span", {"class":"currency-value"}).text)
-    price.update({li:price_li})
-
-    link_li = str(matchi.find("h2",{"class":"text-gray text-truncate mb-xs-0 text-body"}).text)   
-    link.update({li:link_li})
+            numrate_i = str(item.find("span",{"class":"text-body-smaller text-gray-lighter display-inline-block icon-b-1"}).text) 
+            numrate_i=numrate_i.strip("()").replace(",","")
+            numrate.append(numrate_i)        
+            #text-body-smaller text-gray-lighter display-inline-block icon-b-1
+            
+            #row = (id_i,href_i,seller_i,price_i,blurb_i,stars_i,numrate_i)
+            #print(row)
+            #li_list.append(li)
+        except Exception as e:
+            id.append("none")
+            href.append("none")
+            seller.append("none")
+            price.append("none")
+            blurb.append("none")
+            stars.append("none")
+            numrate.append("none")
+            #li_list.append(li)
     
-    li_list.append(li)
+#%% Create DataFrame from all the catagory lists
     
-    #print(linki.text)
-#%%
-df = pd.DataFrame()
+#df = pd.DataFrame({"li_num":li_list})
+df = pd.DataFrame({"id":id})
      
+#df["li_num"] = li_list
+df["href"] = href
 df["price"] = price
-df["link"] = link
+df["blurb"] = blurb
+df["seller"] = seller
+df["stars"] = stars
+df["numrate"] = numrate
