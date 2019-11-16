@@ -39,8 +39,6 @@ auc = roc_auc_score(y_valid, y_predict)
 print('AUC (  no_scaling )=',round(auc,5))
 recall = recall_score(y_valid, y_predict)
 print('Recall( no scaling )',round(recall,5))
-
-
 #%%
 
 model = LogisticRegression(random_state=0, solver='liblinear', multi_class='ovr')
