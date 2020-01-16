@@ -6,8 +6,29 @@ Created on Fri Nov  1 10:05:43 2019
 """
 #https://pandas.pydata.org/pandas-docs/stable/user_guide/cookbook.html#cookbook-selection
 
-import pandas as pd
+import os, platform
 import numpy as np
+import pandas as pd
+import matplotlib
+import matplotlib.pyplot as plt
+import seaborn as sn
+#%% Check versions
+
+print("System")
+print("os name: %s" % os.name)
+print("system: %s" % platform.system())
+print("release: %s" % platform.release())
+print()
+#print("Python")
+#print("version: %s" % python_version())
+print()
+print("Python Packages")
+#print("jupterlab==%s" % jupyterlab.__version__)
+print("pandas==%s" % pd.__version__)
+print("numpy==%s" % np.__version__)
+print("matplotlib==%s" % matplotlib.__version__)
+print("seaborn==%s" % sn.__version__)
+
 
 #%% Creating a DataFrame
 
