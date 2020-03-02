@@ -237,6 +237,7 @@ from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import StandardScaler
 from sklearn.preprocessing import power_transform
 from sklearn.model_selection import cross_val_score
+from sklearn.model_selection import GridSearchCV
 from sklearn.pipeline import make_pipeline
 from sklearn.pipeline import Pipeline
 from sklearn.tree import DecisionTreeRegressor
@@ -266,7 +267,7 @@ x_tr = pipeline.fit_transform(x)
 full_pipeline = ColumnTransformer([
         ("num", pipeline, list(x.columns))])
 x_prepared = full_pipeline.fit_transform(x)
-#%%
+#%% -- Linear Regression
 
 #housing_prepared = full_pipeline.fit_transform(housing)
 
@@ -283,9 +284,9 @@ def display_score(scores):
 
 display_score(lin_stsc_scores)
 
-#%%
+#%% -- Elastic Net
 from sklearn.linear_model import ElasticNet
-ALPHA, L1_r = 0.1,0.5
+ALPHA, L1_r = 0.05,0.4
 elast_net =ElasticNet(alpha=ALPHA, l1_ratio=L1_r)
 scores = cross_val_score(elast_net,x_prepared,y,scoring="neg_mean_squared_error",cv=6)
 elast_net_scores = np.sqrt(-scores)
@@ -384,11 +385,60 @@ def display_score(scores):
     print("StDev:", scores.std().round(2))
 
 display_score(pca_elastnet_scores)
+#%% --------------------------------------
+#---  GRID SEARCH -- Elastic Net
+# ----------------------------------------
 
-
-
-
+def two_param_grid_search(model, x_data):
+    # Set Parameter Names and search values
+    p_names = ["alpha","l1_ratio"]
+    p_vectors = [list(np.linspace(.05,.5,10)),list(np.linspace(.01,.99,10))]
+    #alpha_list = list(np.linspace(.05,.5,10))
+    #l1_ratio_list = list(np.linspace(.01,.99,10))
+    
+    param_grid = [{p_names[0]:p_vectors[0],p_names[1]:p_vectors[1]}]
+    #elast_net4 =ElasticNet()
+    grid_search = GridSearchCV(model, param_grid, cv=6,scoring="neg_mean_squared_error",
+                               return_train_score=True, iid="False")
+    grid_search.fit(x_data,y)
+    
+    elast_net_GS_scores = np.sqrt(-grid_search.best_score_)
+    #cv_results = grid_search.cv_results_
+    print(grid_search.best_params_)
+    print(round(elast_net_GS_scores))
+    
+    results = grid_search.cv_results_
+    # Lengths of grid_search atribute vecotrs
+    v = list(param_grid[0])
+    l0 = len(param_grid[0][v[0]])
+    l1 = len(param_grid[0][v[1]])
+    # all training results
+    grid_mean_test_score = np.sqrt(-results["mean_test_score"]).round(0).reshape((l0,l1))
+    # all testing results
+    grid_mean_train_score = np.sqrt(-results["mean_train_score"]).round(0).reshape((l0,l1))
+ 
+    ind = []
+    for i in range(len(p_names)):
+        ind.append(p_vectors[i].index(grid_search.best_params_[p_names[i]]))
+        #print(ind)
+    plt.plot(np.array(grid_mean_test_score)[ind[0]])
+    #plt.plot(np.array(grid_mean_train_score)[ind[0]])
+    plt.show()
+    plt.plot(np.array(grid_mean_test_score).T[ind[1]])
+    plt.show()
+    #plt.plot(np.array(grid_mean_train_score).T[ind[1]])
+    
+    return
 #%%
+#two_param_grid_search(model=ElasticNet(max_iter=10000), x_data=x_prepared)
+two_param_grid_search(model=ElasticNet(max_iter=100000), x_data=x_poly)
+
+
+
+
+
+
+
 
 
 
