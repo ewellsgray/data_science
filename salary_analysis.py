@@ -236,6 +236,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import StandardScaler
 from sklearn.preprocessing import power_transform
+from sklearn.model_selection import cross_val_score
 from sklearn.pipeline import make_pipeline
 from sklearn.pipeline import Pipeline
 from sklearn.tree import DecisionTreeRegressor
@@ -244,20 +245,158 @@ from sklearn.svm import NuSVR
 from sklearn.svm import SVR
 from sklearn import metrics
 from sklearn.decomposition import PCA
+from sklearn.compose import ColumnTransformer
 log_class = LogisticRegression()
+#%%
+lin_reg =LinearRegression()
+scores1 = cross_val_score(lin_reg,x,y,scoring="neg_mean_squared_error",cv=6)
+lin_scores = np.sqrt(-scores1)
+
+def display_score(scores):
+    print("Scores:", scores.round(2))
+    print("Mean:", scores.mean().round(2))
+    print("StDev:", scores.std().round(2))
+
+display_score(lin_scores)
+
+#%%
+pipeline = Pipeline([('std_scaler',StandardScaler())])
+x_tr = pipeline.fit_transform(x)
+#%%
+full_pipeline = ColumnTransformer([
+        ("num", pipeline, list(x.columns))])
+x_prepared = full_pipeline.fit_transform(x)
+#%%
+
+#housing_prepared = full_pipeline.fit_transform(housing)
+
+#lin_reg =LinearRegression()
+lin_stsc =LinearRegression()
+scores2 = cross_val_score(lin_stsc,x_prepared,y,scoring="neg_mean_squared_error",cv=6)
+lin_stsc_scores = np.sqrt(-scores2)
+
+print("\nLinear Regression:")
+def display_score(scores):
+    print("Scores:", scores.round(2))
+    print("Mean:", scores.mean().round(2))
+    print("StDev:", scores.std().round(2))
+
+display_score(lin_stsc_scores)
+
+#%%
+from sklearn.linear_model import ElasticNet
+ALPHA, L1_r = 0.1,0.5
+elast_net =ElasticNet(alpha=ALPHA, l1_ratio=L1_r)
+scores = cross_val_score(elast_net,x_prepared,y,scoring="neg_mean_squared_error",cv=6)
+elast_net_scores = np.sqrt(-scores)
+
+print("\nElastic Net: alpha="+str(ALPHA)+", l1_ratio="+str(L1_r))
+def display_score(scores):
+    print("Scores:", scores.round(2))
+    print("Mean:", scores.mean().round(2))
+    print("StDev:", scores.std().round(2))
+
+display_score(elast_net_scores)
+
+#%%
+MAX_DEPTH=5
+tree_reg =DecisionTreeRegressor(max_depth=MAX_DEPTH)
+scores3 = cross_val_score(tree_reg,x_prepared,y,scoring="neg_mean_squared_error",cv=6)
+tree_reg_scores = np.sqrt(-scores3)
+
+print("\nDecision Tree: Max Depth=", MAX_DEPTH)
+def display_score(scores):
+    print("Scores:", scores.round(2))
+    print("Mean:", scores.mean().round(2))
+    print("StDev:", scores.std().round(2))
+
+display_score(tree_reg_scores)
+
+#%%
+svreg = SVR(degree=3, gamma='auto', kernel='poly')
+scores4 = cross_val_score(svreg,x_prepared,y,scoring="neg_mean_squared_error",cv=6)
+svreg_scores = np.sqrt(-scores4)
+
+print("\nSVM")
+def display_score(scores):
+    print("Scores:", scores.round(2))
+    print("Mean:", scores.mean().round(2))
+    print("StDev:", scores.std().round(2))
+
+display_score(svreg_scores)
+#%%%
+from sklearn.ensemble import RandomForestRegressor
+N_EST, MAX_DEPTH_r=10,10
+rand_for =RandomForestRegressor(n_estimators=N_EST, max_depth=MAX_DEPTH_r,random_state=0)
+scores = cross_val_score(rand_for,x_prepared,y,scoring="neg_mean_squared_error",cv=6)
+rand_for_scores = np.sqrt(-scores )
+
+print("\nRandom Forest: n_est="+str(N_EST)+", max_depth="+str(MAX_DEPTH_r))
+def display_score(scores):
+    print("Scores:", scores.round(2))
+    print("Mean:", scores.mean().round(2))
+    print("StDev:", scores.std().round(2))
+
+display_score(rand_for_scores)
+
+#%%
+from sklearn.preprocessing import PolynomialFeatures
+
+# Add polynomial features
+poly_features = PolynomialFeatures(degree=2, include_bias=True)
+x_poly=poly_features.fit_transform(x_prepared)
+
+ALPHA, L1_r = .1,0.6
+elast_net2 =ElasticNet(alpha=ALPHA, l1_ratio=L1_r)
+scores = cross_val_score(elast_net2,x_poly,y,scoring="neg_mean_squared_error",cv=6)
+elast_net_scores2 = np.sqrt(-scores)
+
+print("\n2nd Deg Poly + Elastic Net: alpha="+str(ALPHA)+", l1_ratio="+str(L1_r))
+def display_score(scores):
+    print("Scores:", scores.round(2))
+    print("Mean:", scores.mean().round(2))
+    print("StDev:", scores.std().round(2))
+
+display_score(elast_net_scores2)
+#%%
+
+# Add polynomial features
+poly_features = PolynomialFeatures(degree=2, include_bias=True)
+x_poly=poly_features.fit_transform(x_prepared)
+#pca=PCA()
+#pca.fit(x_poly)
+#cumsum = np.cumsum(pca.explained_variance_ratio_)
+#plt.plot(cumsum)
+
+#pca=PCA(n_components=.94)
+#pca.fit_transform(x_poly)
+ALPHA, L1_r = .5,0.5
+elast_net2 =ElasticNet(alpha=ALPHA, l1_ratio=L1_r)
+pca_elastnet = Pipeline([("pca",PCA(n_components=.95)),("elast_net3",ElasticNet(alpha=ALPHA, l1_ratio=L1_r))])
+
+scores = cross_val_score(pca_elastnet,x_poly,y,scoring="neg_mean_squared_error",cv=6)
+pca_elastnet_scores = np.sqrt(-scores)
+
+print("\nElastic Net: alpha="+str(ALPHA)+", l1_ratio="+str(L1_r))
+def display_score(scores):
+    print("Scores:", scores.round(2))
+    print("Mean:", scores.mean().round(2))
+    print("StDev:", scores.std().round(2))
+
+display_score(pca_elastnet_scores)
+
+
+
+
+#%%
+
+
+
 
 
 #%%
 scalar = StandardScaler()
 xc = scalar.fit_transform(x)
-
-
-
-
-
-
-
-
 
 
 #%%
@@ -300,7 +439,7 @@ def dec_tree_simple(X,Y,stsc=False, boxcox=False):
         print("Using StandardScaler")
         #print(X.iloc[5,:])
     else:
-        model =make_pipeline(DecisionTreeRegressor(max_depth=5,random_state=42))
+        model =make_pipeline(display_score)
         print("Not Using StandardScaler")
         #print(X.iloc[5,:])
     #model = LinearRegression()
