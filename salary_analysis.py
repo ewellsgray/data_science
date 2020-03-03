@@ -32,14 +32,14 @@ df.rename(columns={"yrs.since.phd":"years_phd","yrs.service":"years_service","ra
 df.columns
 
 # Check to make sure consistent entry for the rank and years_service variables
-df["title"].value_counts()
-df["years_service"].value_counts()
+df["title"].value_counts() # Prof:266, AsstProf:67, AssocProf: 64
+df["years_service"].value_counts() # int 64 ranging from 3-60. No Nans
 
 # Filter and count number of entries
 df_filt1 = df.loc[(df.title=="AsstProf") & (df.years_service<5)]
 print(df_filt1)
 print(len(df_filt1))
-num_filterd = len(df_filt1)
+num_filtered = len(df_filt1)
 percentage = (num_filterd / num_all_records) * 100
 
 
@@ -59,6 +59,38 @@ sal_m.shape # (358,)
 t_stat, p_val = stats.ttest_ind(sal_m, sal_f, equal_var=False)
 print("t stat: "+str(round(t_stat,4)))
 print("p val: "+str(round(p_val,4)))
+#%% Question 3
+#df_filt1 = df.loc[(df.title=="AsstProf") & (df.years_service<5)]
+mean_rank = df.groupby(["title"]).mean().salary
+med_rank = df.groupby(["title"]).median().salary
+std_rank = df.groupby(["title"]).std().salary
+
+mean_disc = df.groupby(["discipline"]).mean().salary
+med_disc = df.groupby(["discipline"]).median().salary
+std_disc = df.groupby(["discipline"]).std().salary
+
+mean_disc_rank = df.groupby(["discipline","title"]).mean().salary
+med_disc_rank = df.groupby(["discipline","title"]).median().salary
+std_disc_rank = df.groupby(["discipline","title"]).std().salary
+
+
+
+#%%
+plt.figure()
+sn.distplot(df.loc[df["title"]=="AsstProf"].salary, color="blue", label="AsstProf")
+sn.distplot(df.loc[df["title"]=="AssocProf"].salary, color="red", label="AssocProf")
+sn.distplot(df.loc[df["title"]=="Prof"].salary, color="green", label="Prof")        
+plt.legend()
+plt.title("Salary Distributions by Rank")
+
+plt.figure()
+sn.distplot(df.loc[df["discipline"]=="A"].salary, color="blue", label="A:Theoretical")
+sn.distplot(df.loc[df["discipline"]=="B"].salary, color="red", label="B:Applied")
+plt.legend()
+plt.title("Salary Distributions by Discipline")
+
+sn.catplot(x="title", y="salary", kind="box", order=["Prof","AssocProf","AsstProf"],
+           hue="discipline", data=df);
 
 #%%
 # -- PREPARE THE DATA
@@ -150,6 +182,12 @@ df["over_40"] = (df.years_phd>40)*1
 
 # 2. 
 df["year_diff"] = df.years_phd - df.years_service
+
+#3 
+df["year_max"] = df[["years_phd","years_service"]].max(axis=1)
+df["year_min"] = df[["years_phd","years_service"]].min(axis=1)
+df["year_mean"] = df[["years_phd","years_service"]].mean(axis=1)
+
 #%%
 def move_target_to_end(df,target_label):
     
@@ -171,6 +209,35 @@ df = move_target_to_end(df,"salary")
 scatter_matrix(df, figsize=(12,9))
 plot_corr_matrix(df)
 
+#%%
+from sklearn.preprocessing import FunctionTransformer
+from sklearn.compose import ColumnTransformer
+#transformer = FunctionTransformer(np.log1p)
+pp = ColumnTransformer([
+        ("transformer1",  FunctionTransformer(np.log1p,validate=False), ["year_mean"]),
+        ("transformer2",  FunctionTransformer(np.log1p,validate=False), ["year_max"])
+        ])
+df_test = df.copy()
+df_test[["year_mean_trans","year_max_trans"]]=pd.DataFrame(pp.fit_transform(df_test))
+df_test = move_target_to_end(df_test,"salary")
+#%%
+df_test = move_target_to_end(df_test,"salary")
+df_= move_target_to_end(df_test,"salary")
+scatter_matrix(df_test, figsize=(12,9))
+plot_corr_matrix(df_test)
+
+#%%
+plt.figure(figsize=(10,3.5))
+#%matplotlib inline
+df_test.corr().iloc[-1].sort_values(ascending=False).plot(kind="bar")
+#plt.show()
+plt.xlabel('feature')
+plt.ylabel('Pearson Correaltion')
+plt.title('Feature Correlation (with Target)')
+#%%
+df_test.drop(["year_min","year_mean","years_phd","years_service","year_mean_trans"],
+             axis=1,inplace=True)
+df=df_test.copy()
 #%%
 # --- CREATE TEST SET -----------------------------------------
 
@@ -247,7 +314,9 @@ from sklearn.svm import NuSVR
 from sklearn.svm import SVR
 from sklearn import metrics
 from sklearn.decomposition import PCA
-from sklearn.compose import ColumnTransformer
+#from sklearn.compose import ColumnTransformer
+from sklearn.compose import TransformedTargetRegressor
+from sklearn.preprocessing import QuantileTransformer
 log_class = LogisticRegression()
 #%%
 lin_reg =LinearRegression()
@@ -268,14 +337,26 @@ x_tr = pipeline.fit_transform(x)
 full_pipeline = ColumnTransformer([
         ("num", pipeline, list(x.columns))])
 x_prepared = full_pipeline.fit_transform(x)
-#%% -- Linear Regression
 
-#housing_prepared = full_pipeline.fit_transform(housing)
+full_pipeline2 = ColumnTransformer([
+        ("std_scaler", StandardScaler(), list(x.columns))        
+        ],remainder="passthrough")
+x_prepared2 = full_pipeline2.fit_transform(x)
+
+
+from sklearn.preprocessing import PolynomialFeatures
+# Add polynomial features
+poly_features = PolynomialFeatures(degree=2, include_bias=True)
+x_poly=poly_features.fit_transform(x_prepared)
+#%% -- Linear Regression
 
 #lin_reg =LinearRegression()
 lin_stsc =LinearRegression()
 scores2 = cross_val_score(lin_stsc,x_prepared,y,scoring="neg_mean_squared_error",cv=6)
 lin_stsc_scores = np.sqrt(-scores2)
+lin_stsc.fit(x_prepared,y)
+coefs=lin_stsc.coef_
+intercept=lin_stsc.intercept_
 
 print("\nLinear Regression:")
 def display_score(scores):
@@ -287,8 +368,8 @@ display_score(lin_stsc_scores)
 
 #%% -- Elastic Net
 from sklearn.linear_model import ElasticNet
-ALPHA, L1_r = 0.05,0.4
-elast_net =ElasticNet(alpha=ALPHA, l1_ratio=L1_r)
+ALPHA, L1_r = 0.1,0.99
+elast_net =ElasticNet(alpha=ALPHA, l1_ratio=L1_r,max_iter=100000)
 scores = cross_val_score(elast_net,x_prepared,y,scoring="neg_mean_squared_error",cv=6)
 elast_net_scores = np.sqrt(-scores)
 
@@ -299,6 +380,22 @@ def display_score(scores):
     print("StDev:", scores.std().round(2))
 
 display_score(elast_net_scores)
+#%% Quantile Tranformer
+ALPHA, L1_r = 0.1,.5
+transformer = QuantileTransformer(output_distribution='normal',n_quantiles=200)
+regressor = ElasticNet(alpha=ALPHA, l1_ratio=L1_r,max_iter=1000000)
+regr = TransformedTargetRegressor(regressor=regressor,
+                                   transformer=transformer)
+scores = cross_val_score(regr,x_prepared,y,scoring="neg_mean_squared_error",cv=6)
+regr_scores = np.sqrt(-scores)
+
+print("\nElastic Net: alpha="+str(ALPHA)+", l1_ratio="+str(L1_r))
+def display_score(scores):
+    print("Scores:", scores.round(2))
+    print("Mean:", scores.mean().round(2))
+    print("StDev:", scores.std().round(2))
+
+display_score(regr_scores)
 
 #%%
 MAX_DEPTH=5
@@ -315,7 +412,7 @@ def display_score(scores):
 display_score(tree_reg_scores)
 
 #%%
-svreg = SVR(degree=3, gamma='auto', kernel='poly')
+svreg = SVR(degree=3, gamma='auto', kernel='linear')
 scores4 = cross_val_score(svreg,x_prepared,y,scoring="neg_mean_squared_error",cv=6)
 svreg_scores = np.sqrt(-scores4)
 
@@ -342,12 +439,7 @@ def display_score(scores):
 display_score(rand_for_scores)
 
 #%%
-from sklearn.preprocessing import PolynomialFeatures
-
-# Add polynomial features
-poly_features = PolynomialFeatures(degree=2, include_bias=True)
-x_poly=poly_features.fit_transform(x_prepared)
-
+"""
 ALPHA, L1_r = .1,0.6
 elast_net2 =ElasticNet(alpha=ALPHA, l1_ratio=L1_r)
 scores = cross_val_score(elast_net2,x_poly,y,scoring="neg_mean_squared_error",cv=6)
@@ -359,7 +451,7 @@ def display_score(scores):
     print("Mean:", scores.mean().round(2))
     print("StDev:", scores.std().round(2))
 
-display_score(elast_net_scores2)
+display_score(elast_net_scores2)"""
 #%%
 
 # Add polynomial features
@@ -390,13 +482,8 @@ display_score(pca_elastnet_scores)
 #---  GRID SEARCH -- Elastic Net
 # ----------------------------------------
 
-def two_param_grid_search(model, x_data):
+def two_param_grid_search(x_data, model, p_names, p_vectors):
     # Set Parameter Names and search values
-    p_names = ["alpha","l1_ratio"]
-    p_vectors = [list(np.linspace(.05,.5,10)),list(np.linspace(.01,.99,10))]
-    #alpha_list = list(np.linspace(.05,.5,10))
-    #l1_ratio_list = list(np.linspace(.01,.99,10))
-    
     param_grid = [{p_names[0]:p_vectors[0],p_names[1]:p_vectors[1]}]
     #elast_net4 =ElasticNet()
     grid_search = GridSearchCV(model, param_grid, cv=6,scoring="neg_mean_squared_error",
@@ -405,6 +492,7 @@ def two_param_grid_search(model, x_data):
     
     elast_net_GS_scores = np.sqrt(-grid_search.best_score_)
     #cv_results = grid_search.cv_results_
+    print("\n")
     print(grid_search.best_params_)
     print(round(elast_net_GS_scores))
     
@@ -417,7 +505,7 @@ def two_param_grid_search(model, x_data):
     grid_mean_test_score = np.sqrt(-results["mean_test_score"]).round(0).reshape((l0,l1))
     # all testing results
     grid_mean_train_score = np.sqrt(-results["mean_train_score"]).round(0).reshape((l0,l1))
- 
+    
     ind = []
     for i in range(len(p_names)):
         ind.append(p_vectors[i].index(grid_search.best_params_[p_names[i]]))
@@ -430,10 +518,76 @@ def two_param_grid_search(model, x_data):
     #plt.plot(np.array(grid_mean_train_score).T[ind[1]])
     
     return
-#%%
-#two_param_grid_search(model=ElasticNet(max_iter=10000), x_data=x_prepared)
-two_param_grid_search(model=ElasticNet(max_iter=100000), x_data=x_poly)
+#%% --------------------------------------
+#---  GRID SEARCH -- Elastic Net
+# ----------------------------------------
 
+def three_param_grid_search(x_data, model, p_names, p_vectors):
+    # Set Parameter Names and search values
+    param_grid = [{p_names[0]:p_vectors[0],p_names[1]:p_vectors[1],p_names[2]:p_vectors[2]}]
+    #elast_net4 =ElasticNet()
+    grid_search = GridSearchCV(model, param_grid, cv=6,scoring="neg_mean_squared_error",
+                               return_train_score=True, iid="False")
+    grid_search.fit(x_data,y)
+    
+    elast_net_GS_scores = np.sqrt(-grid_search.best_score_)
+    #cv_results = grid_search.cv_results_
+    print("\n")
+    print(grid_search.best_params_)
+    print(round(elast_net_GS_scores))
+    """
+    results = grid_search.cv_results_
+    # Lengths of grid_search atribute vecotrs
+    v = list(param_grid[0])
+    l0 = len(param_grid[0][v[0]])
+    l1 = len(param_grid[0][v[1]])
+    # all training results
+    grid_mean_test_score = np.sqrt(-results["mean_test_score"]).round(0).reshape((l0,l1))
+    # all testing results
+    grid_mean_train_score = np.sqrt(-results["mean_train_score"]).round(0).reshape((l0,l1))
+    
+    ind = []
+    for i in range(len(p_names)):
+        ind.append(p_vectors[i].index(grid_search.best_params_[p_names[i]]))
+        #print(ind)
+    plt.plot(np.array(grid_mean_test_score)[ind[0]])
+    #plt.plot(np.array(grid_mean_train_score)[ind[0]])
+    plt.show()
+    plt.plot(np.array(grid_mean_test_score).T[ind[1]])
+    plt.show()
+    #plt.plot(np.array(grid_mean_train_score).T[ind[1]])"""
+    
+    return
+#%%
+
+#two_param_grid_search(model=ElasticNet(max_iter=10000), x_data=x_prepared)
+p_names = ["alpha","l1_ratio"]
+p_vectors = [list(np.linspace(.05,.5,10)),list(np.linspace(.01,.99,10))]
+two_param_grid_search(x_data=x_poly, model=ElasticNet(max_iter=1000000),
+                      p_names=p_names, p_vectors=p_vectors)
+
+#%% -------------------------------
+#  --  Random Forest GRID SEARCH
+# --------------------------------
+'''
+p_names = ["max_features","n_estimators","max_depth"]
+p_vectors = [list(np.linspace(2,8,9).astype(int)),
+             list(np.linspace(2,20,10).astype(int)),
+             list(np.linspace(2,20,10).astype(int))]
+rf_reg = RandomForestRegressor(random_state=0)
+three_param_grid_search(x_data=x_prepared, model=rf_reg,
+                      p_names=p_names, p_vectors=p_vectors)
+'''
+#%% -------------------------------
+#  --  SVR GRID SEARCH
+# --------------------------------
+p_names = ["degree","C","epsilon"]
+p_vectors = [[1,2,3],
+             list(np.linspace(10,500,4)),
+             list(np.linspace(.02,1,4).astype(int))]
+svr = SVR(kernel="linear", gamma="scale")
+three_param_grid_search(x_data=x_prepared, model=svr,
+                      p_names=p_names, p_vectors=p_vectors)
 
 #%% Logistic Regression Classifier
 
