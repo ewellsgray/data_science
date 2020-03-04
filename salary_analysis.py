@@ -40,9 +40,31 @@ df_filt1 = df.loc[(df.title=="AsstProf") & (df.years_service<5)]
 print(df_filt1)
 print(len(df_filt1))
 num_filtered = len(df_filt1)
-percentage = (num_filterd / num_all_records) * 100
+percentage = (num_filtered / num_all_records) * 100
+#%% Fewer female full profs?
 
+df_fem_prof = df.loc[(df.title=="AsstProf") & (df.sex=="Female")]
+print(len(df_fem_prof))
+df_male_prof = df.loc[(df.title=="AsstProf") & (df.sex=="Male")]
+print(len(df_male_prof))
+#%% Years service differnece
+prof_female_years = df.loc[(df.title=="AsstProf") & (df.sex=="Female")].years_service
+prof_female_years.std()
+#print(len(df_fem_prof))
+prof_male_years = df.loc[(df.title=="AsstProf") & (df.sex=="Male")].years_service
+prof_male_years.mean()
+#print(len(df_male_prof))
 
+# Two-sided independent-sample t-test, unequal variance (Welches t-test)
+t_stat, p_val = stats.ttest_ind(prof_female_years, prof_male_years, equal_var=False)
+print("t stat: "+str(round(t_stat,4)))
+print("p val: "+str(round(p_val,4)))
+#%%
+#2.34from statsmodels.stats.power.TTestIndPower import solve_power
+from statsmodels.stats.power import TTestIndPower
+test=TTestIndPower()
+test.solve_power(effect_size=0.11, nobs1=None, 
+                                 alpha=.01, power=0.9, ratio=5.0, alternative='two-sided')
 #%% (2) Is there a statistically significant difference between female and male salaries?
 
 # Check to make sure consistent entry for the salary and sex variables
@@ -73,9 +95,26 @@ mean_disc_rank = df.groupby(["discipline","title"]).mean().salary
 med_disc_rank = df.groupby(["discipline","title"]).median().salary
 std_disc_rank = df.groupby(["discipline","title"]).std().salary
 
-
+#%% Number os samples needed to test if women make less within first 2 year
+ALPHA = .01
+es = 4000/df.loc[df.years_service<=2].std().salary
+test=TTestIndPower()
+test.solve_power(effect_size=0.25, nobs1=None, 
+                                 alpha=ALPHA, power=0.9, ratio=5.0, alternative='two-sided')
 
 #%%
+plt.figure()
+sn.distplot(df.loc[df["sex"]=="Male"].salary, color="blue", label="Male")
+sn.distplot(df.loc[df["sex"]=="Female"].salary, color="red", label="Female")      
+plt.legend()
+plt.title("Salary Distributions by Sex")
+
+mean_sex = df.groupby(["sex"]).mean().salary
+med_sex = df.groupby(["sex"]).median().salary
+std_sex = df.groupby(["sex"]).std().salary
+#%%
+
+
 plt.figure()
 sn.distplot(df.loc[df["title"]=="AsstProf"].salary, color="blue", label="AsstProf")
 sn.distplot(df.loc[df["title"]=="AssocProf"].salary, color="red", label="AssocProf")
@@ -88,9 +127,27 @@ sn.distplot(df.loc[df["discipline"]=="A"].salary, color="blue", label="A:Theoret
 sn.distplot(df.loc[df["discipline"]=="B"].salary, color="red", label="B:Applied")
 plt.legend()
 plt.title("Salary Distributions by Discipline")
+#%%
+plt.figure()
+sn.distplot(df.loc[df["title"]=="AsstProf"].years_service, color="blue", label="AsstProf")
+sn.distplot(df.loc[df["title"]=="AssocProf"].years_service, color="red", label="AssocProf")
+sn.distplot(df.loc[df["title"]=="Prof"].years_service, color="green", label="Prof")
+plt.legend()
+plt.title("Years Service Distributions by Discipline")
+#%%
+sn.scatterplot(df.years_service,df.salary,hue="title",data=df)
+sn.scatterplot(df.years_phd,df.salary,hue="title",data=df)
+sn.scatterplot(df.years_phd,df.salary,hue="sex",data=df)
+#%%
+df.years_service.hist()
 
-sn.catplot(x="title", y="salary", kind="box", order=["Prof","AssocProf","AsstProf"],
+#%%
+g=sn.catplot(x="title", y="salary", kind="box", order=["Prof","AssocProf","AsstProf"],
            hue="discipline", data=df);
+g.fig.set_size_inches(7,5)
+sn.set_style("whitegrid", {'axes.grid' : False})
+#sn.set_style('axes.grid'=True)
+#ax.grid(True)
 
 #%%
 # -- PREPARE THE DATA
